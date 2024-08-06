@@ -1,100 +1,84 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import TaskForm from './components/TaskForm';
-import './App.css'; // Assuming you have some global styles here
+import './App.css';
 
-function App() {
+const App = () => {
   const [tasks, setTasks] = useState([]);
-  const [editingTask, setEditingTask] = useState(null);
+  const [currentTask, setCurrentTask] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks));
-    }
+    const fetchTasks = async () => {
+      try {
+        const response = await axios.get('http://192.168.29.106:8000/api/tasks/');
+        setTasks(response.data);
+      } catch (err) {
+        console.error('Failed to fetch tasks', err);
+      }
+    };
+
+    fetchTasks();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  const handleSave = (task) => {
-    if (editingTask) {
-      const updatedTasks = tasks.map((t) =>
-        t === editingTask ? { ...task } : t
-      );
-      setTasks(updatedTasks);
-    } else {
-      setTasks([...tasks, task]);
-    }
-    setEditingTask(null);
+  const handleSave = (savedTask) => {
+    setTasks((prevTasks) =>
+      currentTask
+        ? prevTasks.map((task) => (task.id === savedTask.id ? savedTask : task))
+        : [...prevTasks, savedTask]
+    );
     setShowForm(false);
+    setCurrentTask(null);
   };
 
   const handleEdit = (task) => {
-    setEditingTask(task);
+    setCurrentTask(task);
     setShowForm(true);
   };
 
-  const handleDelete = (task) => {
-    setTasks(tasks.filter((t) => t !== task));
+  const handleDelete = async (taskId) => {
+    try {
+      await axios.delete(`http://192.168.29.106:8000/api/tasks/${taskId}/`);
+      setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
+    } catch (err) {
+      console.error('Failed to delete task', err);
+    }
   };
 
   const handleCancel = () => {
-    setEditingTask(null);
     setShowForm(false);
-  };
-
-  const renderTasks = (status) => {
-    return tasks
-      .filter((task) => task.status === status)
-      .map((task, index) => (
-        <div key={index} className="task-item">
-          <h3>{task.title}</h3>
-          <p>{task.description}</p>
-          <p>Status: {task.status}</p>
-          <div className="task-buttons">
-            <button onClick={() => handleEdit(task)}>Edit</button>
-            <button onClick={() => handleDelete(task)}>Delete</button>
-          </div>
-        </div>
-      ));
+    setCurrentTask(null);
   };
 
   return (
-    <div className="App">
+    <div className="app-container">
       <Sidebar />
       <Header />
-      <button className="open-form-button" onClick={() => setShowForm(true)}>
-        {editingTask ? 'Edit Task' : 'Create New Task'}
-      </button>
-      {showForm && (
-        <div className="task-form-overlay">
-          <TaskForm
-            task={editingTask}
-            onSave={handleSave}
-            onCancel={handleCancel}
-          />
-        </div>
-      )}
+      <button onClick={() => setShowForm(true)} className="add-task-button">Add Task</button>
       <div className="task-columns">
-        <div style={{ width: '32%', background: '#eb5934', borderRadius: '8px' }}>
-          <h2 className='headingNameh'>To Do</h2>
-          {renderTasks('To Do')}
-        </div>
-        <div style={{ width: '32%', background: '#ebe834', borderRadius: '8px' }}>
-          <h2 className='headingNameh'>In Progress</h2>
-          {renderTasks('In Progress')}
-        </div>
-        <div style={{ width: '32%', background: '#34eb67', borderRadius: '8px' }}>
-          <h2 className='headingNameh'>Done</h2>
-          {renderTasks('Done')}
-        </div>
+        {['To Do', 'In Progress', 'Done'].map((status) => (
+          <div key={status} className={`task-column ${status.toLowerCase().replace(' ', '-')}`}>
+            <h3>{status}</h3>
+            {tasks.filter((task) => task.status === status).map((task) => (
+              <div key={task.id} className="task-item">
+                <h4>{task.title}</h4>
+                <p>{task.description}</p>
+                <div className="task-actions">
+                  <button onClick={() => handleEdit(task)}>Edit</button>
+                  <button onClick={() => handleDelete(task.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
+      {showForm && (
+        <TaskForm task={currentTask} onSave={handleSave} onCancel={handleCancel} />
+      )}
     </div>
   );
-}
+};
 
 export default App;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './Style/TaskForm.css';
 
-const TaskForm = ({ task, onSave, onCancel }) => {
+const TaskForm = ({ task, onSave, onCancel, onDelete }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('To Do');
@@ -23,11 +23,17 @@ const TaskForm = ({ task, onSave, onCancel }) => {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.post('http://192.168.29.106:8000/api/tasks/', {
-          title,
-          description,
-          status,
-        });
+        const response = task
+          ? await axios.put(`http://192.168.29.106:8000/api/tasks/${task.id}/`, {
+            title,
+            description,
+            status,
+          })
+          : await axios.post('http://192.168.29.106:8000/api/tasks/', {
+            title,
+            description,
+            status,
+          });
         onSave(response.data);
       } catch (err) {
         setError('Failed to save task. Please try again.');
@@ -36,6 +42,21 @@ const TaskForm = ({ task, onSave, onCancel }) => {
       }
     } else {
       alert('Please fill out both title and description.');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (task) {
+      setLoading(true);
+      setError(null);
+      try {
+        await axios.delete(`http://192.168.29.106:8000/api/tasks/${task.id}/`);
+        onDelete(task.id);
+      } catch (err) {
+        setError('Failed to delete task. Please try again.');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -62,10 +83,15 @@ const TaskForm = ({ task, onSave, onCancel }) => {
             <option value="In Progress">In Progress</option>
             <option value="Done">Done</option>
           </select>
-          <div className="savebutton">
+          <div className="button-group">
             <button type="submit" disabled={loading}>
               {loading ? 'Saving...' : 'Save Task'}
             </button>
+            {task && (
+              <button type="button" onClick={handleDelete} disabled={loading}>
+                {loading ? 'Deleting...' : 'Delete Task'}
+              </button>
+            )}
             <button type="button" onClick={onCancel}>Cancel</button>
           </div>
         </form>
